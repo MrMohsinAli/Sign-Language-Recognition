@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Translator</title>
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #1a1a1a; 
+            color: white;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+        }
+
+        .container { 
+            background: #2d2d2d; 
+            padding: 2rem; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            text-align: center; 
+            width: 90%; 
+            max-width: 500px; 
+        }
+
+        video { 
+            width: 100%; 
+            border-radius: 10px; 
+            border: 3px solid #00ffcc;
+            background: #000; 
+        }
+
+        .output-box { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background: #3d3d3d; 
+            border-radius: 8px; 
+        }
+
+        #final-sentence { 
+            font-size: 1.8rem; 
+            color: #00ffcc; 
+            font-weight: bold; 
+            display: block;
+            margin-top: 10px;
+            min-height: 40px;
+        }
+
+        button { 
+            background: #ff4757; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 15px;
+            transition: 0.3s;
+        }
+
+        button:hover { background: #ff6b81; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Sign Translator</h1>
+        
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        
+        <div class="output-box">
+            <p>Current Sign: <strong id="current-label">...</strong></p>
+            <hr>
+            <p>Sentence:</p>
+            <span id="final-sentence"></span>
+        </div>
+
+        <button onclick="clearSentence()">Clear Sentence</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const labelDisplay = document.getElementById('current-label');
+        const sentenceDisplay = document.getElementById('final-sentence');
+        
+        let lastLetter = "";
+        let sentence = "";
+
+        // Permission and Camera Start
+        async function startWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera access denied. Please allow camera permissions.");
+            }
+        }
+
+        // Send data to Flask app.py
+        async function sendFrame() {
+            // Match the size your model expects (e.g., 400x300 or 64x64)
+            canvas.width = 400;
+            canvas.height = 300;
+            context.drawImage(video, 0, 0, 400, 300);
+            
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData })
+                });
+
+                const data = await response.json();
+                
+                if (data.prediction) {
+                    labelDisplay.innerText = data.prediction;
+                    
+                    // Logic to build the sentence
+                    if (data.prediction !== lastLetter) {
+                        if (data.prediction === "Space") {
+                            sentence += " ";
+                        } else {
+                            sentence += data.prediction;
+                        }
+                        sentenceDisplay.innerText = sentence;
+                        lastLetter = data.prediction;
+                    }
+                }
+            } catch (e) {
+                console.log("Waiting for server...");
+            }
+        }
+
+        function clearSentence() {
+            sentence = "";
+            sentenceDisplay.innerText = "";
+            lastLetter = "";
+        }
+
+        startWebcam();
+        // Capture every 1 second (1000ms) to give the user time to switch signs
+        setInterval(sendFrame, 1000);
+    </script>
+</body>
+</html>
