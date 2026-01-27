@@ -1,153 +1,426 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Language Translator</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASL Recognition Interface</title>
+<style>
+    /* --- THEME: Cyberpunk / Dark Mode --- */
+    body { 
+        background-color: #0b0b0b; 
+        color: #00ff99; 
+        font-family: 'Courier New', Courier, monospace; 
+        margin: 0; 
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        box-sizing: border-box;
+    }
+
+    h2 { 
+        text-transform: uppercase; 
+        letter-spacing: 3px; 
+        text-shadow: 0 0 8px #00ff99; 
+        margin: 0 0 20px 0;
+    }
+
+    .main-container {
+        display: flex;
+        flex-direction: row;
+        gap: 30px;
+        width: 100%;
+        max-width: 1200px;
+        height: 85vh;
+    }
+
+    .input-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .library-section {
+        flex: 0.6;
+        border: 1px solid #333;
+        background: #111;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    /* --- VIDEO FEED --- */
+    .video-wrapper {
+        position: relative;
+        border: 2px solid #00ff99;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 255, 153, 0.15);
+        background: #000;
+        width: 100%;
+        padding-top: 56.25%; /* 16:9 Aspect Ratio */
+        overflow: hidden;
+    }
+
+    video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1); /* Mirror effect */
+    }
+
+    /* Hidden canvas for capturing frames */
+    #captureCanvas {
+        display: none;
+    }
+
+    /* --- DETECTION DISPLAY --- */
+    .prediction-panel {
+        display: flex;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .current-char-box {
+        background: rgba(0, 255, 153, 0.05);
+        border: 1px solid #00ff99;
+        border-radius: 6px;
+        width: 130px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+    }
+
+    #detectedChar {
+        font-size: 60px;
+        font-weight: bold;
+        margin: 0;
+        line-height: 1;
+        text-shadow: 0 0 15px #00ff99;
+    }
     
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #1a1a1a; 
-            color: white;
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 100vh; 
-            margin: 0; 
-        }
+    .confidence-meter { font-size: 10px; opacity: 0.7; margin-top: 5px; }
 
-        .container { 
-            background: #2d2d2d; 
-            padding: 2rem; 
-            border-radius: 15px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
-            text-align: center; 
-            width: 90%; 
-            max-width: 500px; 
-        }
+    /* --- SENTENCE INPUT & BUTTONS --- */
+    .sentence-box {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
 
-        video { 
-            width: 100%; 
-            border-radius: 10px; 
-            border: 3px solid #00ffcc;
-            background: #000; 
-        }
+    #sentenceInput {
+        background: #000;
+        border: 1px solid #333;
+        color: #fff;
+        padding: 15px;
+        font-size: 22px;
+        border-radius: 6px;
+        font-family: inherit;
+        width: 100%;
+        box-sizing: border-box;
+    }
 
-        .output-box { 
-            margin-top: 20px; 
-            padding: 15px; 
-            background: #3d3d3d; 
-            border-radius: 8px; 
-        }
+    .button-group {
+        display: flex;
+        gap: 10px;
+        height: 45px;
+    }
 
-        #final-sentence { 
-            font-size: 1.8rem; 
-            color: #00ffcc; 
-            font-weight: bold; 
-            display: block;
-            margin-top: 10px;
-            min-height: 40px;
-        }
+    button {
+        flex: 1;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        text-transform: uppercase;
+        font-family: inherit;
+        font-size: 12px;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+    }
 
-        button { 
-            background: #ff4757; 
-            color: white; 
-            border: none; 
-            padding: 10px 20px; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            margin-top: 15px;
-            transition: 0.3s;
-        }
+    .btn-copy { background: #00ff99; color: #000; }
+    .btn-copy:hover { background: #fff; box-shadow: 0 0 10px #fff; }
 
-        button:hover { background: #ff6b81; }
-    </style>
+    .btn-backspace { background: #ffcc00; color: #000; }
+    .btn-backspace:hover { background: #fff; box-shadow: 0 0 10px #ffcc00; }
+
+    .btn-clear { background: #ff3333; color: white; }
+    .btn-clear:hover { background: #ff6666; box-shadow: 0 0 10px #ff3333; }
+
+    /* --- REFERENCE LIBRARY --- */
+    .lib-header {
+        padding: 15px;
+        background: #1a1a1a;
+        border-bottom: 1px solid #333;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .grid-scroller {
+        padding: 15px;
+        overflow-y: auto;
+        height: 100%;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 10px;
+    }
+
+    .ref-card {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .ref-card img {
+        width: 100%;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-bottom: 5px;
+        filter: grayscale(100%) opacity(0.6);
+        transition: 0.3s;
+    }
+
+    .ref-card span { font-size: 18px; font-weight: bold; color: #555; }
+
+    .ref-card.active {
+        border-color: #00ff99;
+        background: rgba(0, 255, 153, 0.15);
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(0, 255, 153, 0.2);
+    }
+    .ref-card.active img { filter: none; opacity: 1; }
+    .ref-card.active span { color: #00ff99; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00ff99; }
+</style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Sign Translator</h1>
-        
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="canvas" style="display:none;"></canvas>
-        
-        <div class="output-box">
-            <p>Current Sign: <strong id="current-label">...</strong></p>
-            <hr>
-            <p>Sentence:</p>
-            <span id="final-sentence"></span>
+    <h2>🤟 Neural Sign Interface (Server Mode)</h2>
+
+    <div class="main-container">
+        <div class="input-section">
+            <div class="video-wrapper">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="captureCanvas"></canvas>
+            </div>
+            
+            <div id="status" style="font-size:12px; color:#666; text-align:center;">
+                Connecting to Python Backend...
+            </div>
+
+            <div class="prediction-panel">
+                <div class="current-char-box">
+                    <span style="font-size:10px; text-transform:uppercase; letter-spacing:1px;">Detected</span>
+                    <div id="detectedChar">-</div>
+                    <div class="confidence-meter" id="confidenceLevel">0%</div>
+                </div>
+
+                <div class="sentence-box">
+                    <input type="text" id="sentenceInput" placeholder="Start signing..." readonly>
+                    <div class="button-group">
+                        <button class="btn-copy" onclick="copyToClipboard()">📋 Copy</button>
+                        <button class="btn-backspace" onclick="backspace()">⌫ Char</button>
+                        <button class="btn-clear" onclick="clearSentence()">✕ Clear All</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <button onclick="clearSentence()">Clear Sentence</button>
+        <div class="library-section">
+            <div class="lib-header">LOCAL LIBRARY</div>
+            <div class="grid-scroller" id="referenceGrid"></div>
+        </div>
     </div>
 
     <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
-        const labelDisplay = document.getElementById('current-label');
-        const sentenceDisplay = document.getElementById('final-sentence');
-        
-        let lastLetter = "";
-        let sentence = "";
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("captureCanvas");
+        const ctx = canvas.getContext("2d");
+        const statusDiv = document.getElementById("status");
+        const detectedCharDiv = document.getElementById("detectedChar");
+        const confidenceDiv = document.getElementById("confidenceLevel");
+        const sentenceInput = document.getElementById("sentenceInput");
+        const referenceGrid = document.getElementById("referenceGrid");
 
-        // Permission and Camera Start
-        async function startWebcam() {
+        // Logic variables
+        let lastChar = "";
+        let streak = 0;
+        const STREAK_THRESHOLD = 5; // How many consistent frames to confirm letter
+        const SEND_INTERVAL = 150;  // Send image every 150ms (Approx 6-7 FPS)
+
+        // Updated Labels list (Matches your Python Backend)
+        const LABELS = ['A','B','C','D','E','F','G','H','I','J','K','L','M',
+                        'N','O','P','Q','R','S','T','U','V','W','X','Y','Z','Space','Delete'];
+
+        // 1. Initialize Reference Library
+        function initLibrary() {
+            LABELS.forEach(char => {
+                if (char === "Delete") return; // Don't show Delete in library
+
+                const div = document.createElement("div");
+                div.className = "ref-card";
+                div.id = `ref-${char}`;
+
+                // Filename logic based on your previous screenshot
+                let filename;
+                if(char === "Space") {
+                    filename = "space_test.jpg";
+                } else {
+                    filename = `${char}_test.jpg`;
+                }
+
+                div.innerHTML = `
+                    <img src="/static/images/${filename}" alt="${char}" onerror="this.parentElement.style.opacity='0.5'">
+                    <span>${char === "Space" ? "␣" : char}</span>
+                `;
+                referenceGrid.appendChild(div);
+            });
+        }
+
+        // 2. Start Camera
+        async function setupCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
                 video.srcObject = stream;
+                statusDiv.innerText = "Camera Active. Sending frames to Python...";
+                statusDiv.style.color = "#00ff99";
+                
+                // Start the sending loop
+                setInterval(sendFrameToBackend, SEND_INTERVAL);
+                
             } catch (err) {
-                alert("Camera access denied. Please allow camera permissions.");
+                statusDiv.innerText = "Error: " + err.message;
+                statusDiv.style.color = "red";
             }
         }
 
-        // Send data to Flask app.py
-        async function sendFrame() {
-            // Match the size your model expects (e.g., 400x300 or 64x64)
-            canvas.width = 400;
-            canvas.height = 300;
-            context.drawImage(video, 0, 0, 400, 300);
-            
-            const imageData = canvas.toDataURL('image/jpeg');
+        // 3. Capture & Send Frame
+        function sendFrameToBackend() {
+            // Draw video frame to canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            try {
-                const response = await fetch('/predict', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageData })
-                });
+            // Convert to Base64 (JPEG format is faster/smaller than PNG)
+            const dataURL = canvas.toDataURL("image/jpeg", 0.7);
 
-                const data = await response.json();
-                
-                if (data.prediction) {
-                    labelDisplay.innerText = data.prediction;
-                    
-                    // Logic to build the sentence
-                    if (data.prediction !== lastLetter) {
-                        if (data.prediction === "Space") {
-                            sentence += " ";
-                        } else {
-                            sentence += data.prediction;
-                        }
-                        sentenceDisplay.innerText = sentence;
-                        lastLetter = data.prediction;
-                    }
+            // POST to Flask
+            fetch("/predict", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataURL })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error("Backend Error:", data.error);
+                } else if (data.prediction) {
+                    updateUI(data.prediction, data.confidence);
+                } else {
+                    // No hand detected
+                    detectedCharDiv.innerText = "-";
+                    confidenceDiv.innerText = "0%";
+                    highlightGrid(null);
                 }
-            } catch (e) {
-                console.log("Waiting for server...");
+            })
+            .catch(err => console.error("Network Error:", err));
+        }
+
+        // 4. Update UI & Sentence Logic
+        function updateUI(char, confidence) {
+            detectedCharDiv.innerText = char === "Space" ? "␣" : char;
+            confidenceDiv.innerText = Math.round(confidence * 100) + "%";
+
+            highlightGrid(char);
+
+            // Sentence Building
+            if (char === lastChar) {
+                streak++;
+                if (streak === STREAK_THRESHOLD) {
+                    handleConfirmedChar(char);
+                    streak = 0; // Reset streak after adding
+                }
+            } else {
+                streak = 0;
+                lastChar = char;
             }
+        }
+
+        function handleConfirmedChar(char) {
+            // Flash effect
+            detectedCharDiv.style.textShadow = "0 0 30px #fff";
+            setTimeout(() => detectedCharDiv.style.textShadow = "0 0 15px #00ff99", 200);
+
+            if (char === "Delete") {
+                backspace();
+            } else if (char === "Space") {
+                sentenceInput.value += " ";
+            } else {
+                sentenceInput.value += char;
+            }
+            sentenceInput.scrollLeft = sentenceInput.scrollWidth;
+        }
+
+        function highlightGrid(char) {
+            document.querySelectorAll(".ref-card.active").forEach(el => el.classList.remove("active"));
+            if(char && char !== "Delete") {
+                const el = document.getElementById(`ref-${char}`);
+                if(el) {
+                    el.classList.add("active");
+                    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }
+            }
+        }
+
+        // 5. Button Functions
+        function backspace() {
+            sentenceInput.value = sentenceInput.value.slice(0, -1);
+            streak = 0;
         }
 
         function clearSentence() {
-            sentence = "";
-            sentenceDisplay.innerText = "";
-            lastLetter = "";
+            sentenceInput.value = "";
+            streak = 0;
         }
 
-        startWebcam();
-        // Capture every 1 second (1000ms) to give the user time to switch signs
-        setInterval(sendFrame, 1000);
+        function copyToClipboard() {
+            if(!sentenceInput.value) return;
+            navigator.clipboard.writeText(sentenceInput.value);
+            const btn = document.querySelector(".btn-copy");
+            const original = btn.innerText;
+            btn.innerText = "COPIED!";
+            setTimeout(() => btn.innerText = original, 1000);
+        }
+
+        // Start
+        window.onload = () => {
+            initLibrary();
+            setupCamera();
+        };
     </script>
 </body>
 </html>
