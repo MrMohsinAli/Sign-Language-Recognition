@@ -17,11 +17,11 @@ A real-time American Sign Language (ASL) recognition system using **Python (Flas
 ### 2. Installation
 ```bash
 # Clone the repo
-git clone [https://github.com/YOUR_USERNAME/YOUR_REPO.git](https://github.com/YOUR_USERNAME/YOUR_REPO.git)
+git clone [https://github.com/YOUR_USERNAME/YOUR_REPO.git]
 
 # Create & Activate Virtual Env
 python -m venv my_env
-source my_env/bin/activate  # Windows: my_env\Scripts\activate
+my_env\Scripts\activate  #MacOS source my_env/bin/activate  
 
 # Install Dependencies
 pip install -r requirements.txt
